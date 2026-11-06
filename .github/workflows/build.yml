@@ -1,0 +1,36 @@
+name: Build SAUCE VST3
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:   # permite correrlo a mano desde la pestaña Actions
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --target SAUCE_VST3 --parallel
+
+      - name: Empaquetar VST3
+        shell: pwsh
+        run: |
+          $vst = Get-ChildItem -Path build -Recurse -Directory -Filter "SAUCE.vst3" | Select-Object -First 1
+          if (-not $vst) { throw "No se encontró SAUCE.vst3" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $vst.FullName -Destination dist -Recurse
+          Get-ChildItem -Recurse dist | Select-Object -First 20 FullName
+
+      - name: Subir artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: SAUCE-VST3-Windows
+          path: dist/SAUCE.vst3
+          if-no-files-found: error
